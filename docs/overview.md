@@ -1,9 +1,9 @@
-# Architectural Specification: Event-Driven Agent Platform
+# Architectural Specification: Durable Agent Runtime
 
 ## 1. System Intent & Scope
-The **Event-Driven Agent Platform** is an enterprise-scale architecture for ingesting, queueing, and orchestrating autonomous AI agent tasks at scale.
+The **Durable Agent Runtime** is an enterprise-scale architecture for ingesting, queueing, and orchestrating autonomous AI agent tasks at scale.
 
-It couples **Java 21 / Spring Boot 3** for high-throughput webhook ingestion, transaction management, deduplication, and Kafka message routing, with a **Python 3.12 Worker Pool** executing sandboxed ReAct/Ralph agentic loops.
+It couples **Java 21 / Spring Boot 3** for high-throughput webhook ingestion, transaction management, deduplication, and Kafka message routing, with a **Python 3.12 Worker Pool** executing sandboxed ReAct/Ralph agentic loops with transactional checkpointing.
 
 ---
 

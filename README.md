@@ -1,25 +1,27 @@
-# Event-Driven Agent Platform ⚡
+# Durable Agent Runtime ⚡
 
 [![Java 21](https://img.shields.io/badge/java-21%20(Spring%20Boot%203)-red.svg)](https://spring.io/)
-[![Python 3.12](https://img.shields.io/badge/python-3.12%20(AI%20Agent)-blue.svg)](https://www.python.org/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12%20(AI%20Worker)-blue.svg)](https://www.python.org/)
 [![Kafka](https://img.shields.io/badge/messaging-Apache%20Kafka-black.svg)](https://kafka.apache.org/)
 [![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL%2016-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/cache-Redis%20(Deduplication)-red.svg)](https://redis.io/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-An enterprise-grade, **event-driven autonomous agent orchestration platform** built with **Java (Spring Boot 3.x)**, **Apache Kafka**, **PostgreSQL**, **Redis**, and **Python**.
+An enterprise-grade, **durable event-driven autonomous agent runtime** built with **Java (Spring Boot 3.x)**, **Apache Kafka**, **PostgreSQL**, **Redis**, and **Python**.
 
-Designed to handle real-world operational challenges: bursty webhook ingestion (e.g., GitHub PRs, PagerDuty incident alerts), alert storm deduplication, backpressure-protected agent execution, durable state machine checkpoints, and human-in-the-loop approvals.
+Standard agent frameworks (LangChain, CrewAI, AutoGen) run in-memory loops. If the host process crashes at turn 18 of a 20-step refactor or incident triage, the entire memory context is lost, wasting tokens and leaving partial side-effects.
+
+**Durable Agent Runtime** treats autonomous agents as **durable distributed state machines**: bursty events (GitHub PRs, monitoring alerts) are buffered via **Apache Kafka**, deduplicated via **Redis**, state-managed via **PostgreSQL**, and executed by a **Python worker pool** running sandboxed ReAct and Ralph loops with transactional step checkpoints.
 
 ---
 
 ## 🎯 Why This Architecture? (Pragmatic Engineering Rationale)
 
-In real production environments, autonomous agents are **distributed systems**, not single script loops:
-1. **Bursty Webhooks vs. Slow LLM Inference**: GitHub webhooks and cloud monitoring alerts arrive in bursts of hundreds per second. LLM inference takes 3–15 seconds per call. Ingesting synchronously over HTTP crashes services. We use **Java Spring Boot + Apache Kafka** as a shock absorber.
-2. **Alert Storm Deduplication**: When an infrastructure incident fires 50 cascading alerts in 2 minutes, we use **Redis `SETNX`** to drop duplicates and acquire distributed locks before burning LLM tokens.
-3. **Durable State Machine**: Agent tasks span minutes to hours. We persist task lifecycle states (`PENDING`, `INVESTIGATING`, `REQUIRES_APPROVAL`, `RESOLVED`) in **PostgreSQL** with ACID consistency.
-4. **Isolated AI Execution**: The **Python AI Worker** consumes from Kafka, runs the ReAct/Ralph agent loop with sandboxed tools, and emits events back to Kafka topics.
+In production, agents are distributed systems with distinct physical requirements:
+1. **Bursty Webhooks vs. Slow LLM Inference**: Webhooks arrive in bursts of hundreds per second, while LLM inference takes 3–15 seconds per call. Ingesting synchronously over HTTP crashes services. We use **Java Spring Boot + Apache Kafka** as an elastic shock absorber.
+2. **Alert Storm Deduplication**: When an infrastructure incident fires 50 cascading alerts in 2 minutes, we use **Redis `SETNX`** to drop duplicates and acquire distributed locks before burning expensive LLM tokens.
+3. **Durable State Machine**: Agent tasks span minutes to hours. We persist task lifecycle states (`PENDING`, `INVESTIGATING`, `REQUIRES_APPROVAL`, `RESOLVED`) in **PostgreSQL** with ACID consistency and turn-level checkpoints.
+4. **Sandboxed AI Execution**: The **Python AI Worker** consumes from Kafka, runs the ReAct/Ralph agent loop with sandboxed subprocess tools, and emits events back to Kafka.
 
 ---
 
@@ -31,7 +33,7 @@ flowchart TD
     
     subgraph SpringBootLayer ["Spring Boot Core Logic"]
         SpringBoot <--> RedisDedupe["Redis<br/>(Deduplication & Distributed Locks)"]
-        SpringBoot <--> PostgresDB["PostgreSQL 16<br/>(Task State Machine & Audit Log)"]
+        SpringBoot <--> PostgresDB["PostgreSQL 16<br/>(Task State Machine & Checkpoints)"]
         SpringBoot --> KafkaProducer["Kafka Event Publisher"]
     end
 
@@ -55,10 +57,10 @@ flowchart TD
 
 ## 🚀 Key Modules & Tech Stack
 
-### 1. Ingestion & Orchestration (`orchestrator-service/`)
+### 1. Ingestion & Orchestrator Service (`orchestrator-service/`)
 * **Framework**: Java 21, Spring Boot 3.3+, Spring Kafka, Spring Data JPA.
 * **Responsibilities**:
-  * High-throughput webhook endpoints with validation and signature verification.
+  * High-throughput webhook ingestion endpoints with HMAC signature verification.
   * In-flight alert deduplication via Redis sliding-window hashes.
   * Managing task state transitions in PostgreSQL.
   * Publishing tasks to Kafka topics with retry topics and Dead-Letter Queues (DLQ).
@@ -76,7 +78,7 @@ flowchart TD
 
 ## 📊 System Resilience Comparison
 
-| Capability | Naive Single-Script Agent | Event-Driven Agent Platform |
+| Capability | Naive Single-Script Agent | Durable Agent Runtime |
 | :--- | :--- | :--- |
 | **Ingestion Capacity** | Fails under burst (>10 concurrent HTTP calls) | **10,000+ req/sec (Buffered via Kafka)** |
 | **Alert Storm Behavior** | Fires 50 separate redundant LLM loops | **Deduplicated in Redis (<5ms)** |
@@ -88,7 +90,7 @@ flowchart TD
 ## 📁 Repository Structure
 
 ```text
-event-driven-agent-platform/
+durable-agent-runtime/
 ├── .github/workflows/ci.yml           # CI for Java & Python services
 ├── orchestrator-service/              # Java 21 / Spring Boot 3.x
 │   ├── pom.xml                        # Maven dependencies (Spring Kafka, Data JPA, Redis)
